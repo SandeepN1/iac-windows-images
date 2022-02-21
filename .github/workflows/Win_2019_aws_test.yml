@@ -1,0 +1,93 @@
+name: 'PackerPipeline for Windows 2019 DEV'
+on:
+  push:
+    branches: [ dev ]
+    paths:
+      - aws/WINDOWS/**
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - aws/WINDOWS/**
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Checkout Action  
+        uses: actions/checkout@v2
+        with:
+          repository: GS-MAFTech/githubactions-image-bakery
+          token: ${{ secrets.REPO_TOKEN }}
+          path: ./action
+      - name: Docker Login & Pull Image
+        run: echo  ${{ secrets.REPO_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin && docker pull ghcr.io/gs-maftech/githubactions-image-bakery:v4
+      # packer init
+      - name: Packer Init
+        uses: ./action/
+        with:
+          operation: packer
+          command: init 
+          arguments: .
+          working_directory: aws/WINDOWS/
+
+      # validate templates
+      - name: Packer Validate
+        uses: ./action/
+        with:
+          operation: packer
+          command: validate 
+          arguments: .
+          working_directory: aws/WINDOWS/
+
+      # Git login for Ansible roles
+      - name: Git Login
+        uses: ./action/
+        with:
+          operation: bash
+          command: ./git-login.sh
+          arguments: ${{ github.actor }} ${{ secrets.REPO_TOKEN }}
+          working_directory: aws/WINDOWS/
+
+      # Create a Vault file for use with packer
+      - name: Create Vault file
+        uses: ./action/
+        with:
+          operation: bash
+          command: ./vault.sh
+          arguments: ${{ secrets.VAULT_SECRET }}
+          working_directory: aws/WINDOWS/
+
+      # Building image
+      - name: Packer Build
+        uses: ./action/
+        with:
+          operation: packer
+          command: build 
+          arguments: -var-file=win2019.auto.pkrvars.hcl .
+          working_directory: aws/WINDOWS/
+        env:
+          PACKER_LOG: 0
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  notify:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: build
+    steps:
+      - name: Checkout Action  
+        uses: actions/checkout@v2
+        with:
+          repository: GS-MAFTech/githubactions-msnotifications
+          token: ${{ secrets.REPO_TOKEN }}
+          ref: dev
+          path: ./
+      - name: Docker Login & Pull Image
+        run: echo  ${{ secrets.REPO_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin && docker pull ghcr.io/gs-maftech/githubactions-msnotifications:v2
+      - name: Send a Notification
+        id: notify
+        uses: ./
+        with:
+          teams_webhook_url: ${{ secrets.TEAMS_HOOK }}
+          message: "Github Action Completed for ${{ github.repository }} with Build Number ${{ github.run_number }} and the outcome for packer build  for windows 2019 is ${{ needs.build.result }}."

@@ -1,0 +1,45 @@
+---
+- hosts: all
+  become_method: runas
+
+  pre_tasks:
+
+    - name: Set fact for Microsoft Azure Machines
+      set_fact:
+        ansible_system_vendor: Microsoft
+      when: ansible_system_vendor == 'Microsoft Corporation'
+
+    - debug: var=ansible_os_name
+
+    - name: Set fact for Microsoft Windows Version for 2019
+      set_fact:
+        ansible_os_name: 2019
+      when: ansible_os_name == 'Microsoft Windows Server 2019 Datacenter'
+
+    - name: Set fact for Microsoft Windows Version for 2016
+      set_fact:
+        ansible_os_name: 2016
+      when: ansible_os_name == 'Microsoft Windows Server 2016 Datacenter'
+
+    - debug: var=ansible_os_name
+
+    - name: Set fact for Microsoft Windows Version for 2012
+      set_fact:
+        ansible_os_name: 2012
+      when: ansible_os_name == 'Microsoft Windows Server 2012 Datacenter'
+
+  tasks:
+
+    - name: Install Boto3 on Windows Machine
+      include_tasks: install_boto3_windows.yml
+
+    - name: Install Filebeat for Windows Server
+      include_role:
+       name: filebeat
+      vars:
+       maf_bu: partner-connect
+       maf_app: app_server
+
+    - name: Install Heat for Windows Server
+      include_role:
+       name: heat

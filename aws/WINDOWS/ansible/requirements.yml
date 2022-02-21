@@ -1,0 +1,12 @@
+---
+
+roles:
+ 
+  - src: https://github.com/ravi-maf/iac-ansible-fireeye.git
+    version: dev
+
+  - src: https://github.com/ravi-maf/iac-ansible-elastic.git
+    version: dev 
+
+  - src: https://github.com/ravi-maf/iac-ansible-heat.git
+    version: dev

@@ -1,0 +1,15 @@
+{
+    "username": "packer",
+    "os_version": "2016",
+    "base": "base",
+    "timestamp": "2021117",
+    "image_sku": "2019-Datacenter",
+    "az_region": "West Europe",
+    "winrm_timeout": "5m",
+    "client_id": "{{env `CLIENT_ID`}}",
+    "client_secret": "{{env `CLIENT_SECRET`}}",
+    "resource_group_name": "resourcegroup01",
+    "storage_account": "maftestsa",
+    "subscription_id": "{{env `SUBSCRIPTION_ID`}}",
+    "tenant_id": "{{env `TENANT_ID`}}"
+}

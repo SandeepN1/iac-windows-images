@@ -1,0 +1,7 @@
+---
+- hosts: all
+  gather_facts: true
+  tasks:
+
+    - name: Include tasks 
+      include_tasks: install_boto3_windows.yml

@@ -1,0 +1,96 @@
+name: 'PackerPipeline for Windows 2016 Azure'
+on:
+  push:
+    branches: [ dev ]
+    paths:
+      - azure/windows_2016_packer**
+  pull_request:
+    branches: [ dev ]
+    paths:
+      - azure/windows_2016_packer/**
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Checkout Action  
+        uses: actions/checkout@v2
+        with:
+          repository: GS-MAFTech/githubactions-image-bakery
+          token: ${{ secrets.REPO_TOKEN }}
+          path: ./action
+      - name: Docker Login & Pull Image
+        run: echo  ${{ secrets.REPO_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin && docker pull ghcr.io/gs-maftech/githubactions-image-bakery:v4
+      # packer init
+      - name: Packer Init
+        uses: ./action/
+        with:
+          operation: packer
+          command: init 
+          arguments: .
+          working_directory: azure/windows_2016_packer/
+
+      # validate templates
+      - name: Packer Validate
+        uses: ./action/
+        with:
+          operation: packer
+          command: validate 
+          arguments: .
+          working_directory: azure/windows_2016_packer/
+
+      # Git login for Ansible roles
+      - name: Git Login
+        uses: ./action/
+        with:
+          operation: bash
+          command: ./git-login.sh
+          arguments: ${{ github.actor }} ${{ secrets.REPO_TOKEN }}
+          working_directory: azure/windows_2016_packer/
+
+      # Create a Vault file for use with packer
+      - name: Create Vault file
+        uses: ./action/
+        with:
+          operation: bash
+          command: ./vault.sh
+          arguments: ${{ secrets.VAULT_SECRET }}
+          working_directory: azure/windows_2016_packer/
+
+      # Building image
+      - name: Packer Build
+        uses: ./action/
+        with:
+          operation: packer
+          command: build 
+          arguments: -var-file=windows2016.auto.pkrvars.hcl .
+          working_directory: azure/windows_2016_packer/
+        env:
+          PACKER_LOG: 0
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+  notify:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: build
+    steps:
+      - name: Checkout Action  
+        uses: actions/checkout@v2
+        with:
+          repository: GS-MAFTech/githubactions-msnotifications
+          token: ${{ secrets.REPO_TOKEN }}
+          ref: dev
+          path: ./
+      - name: Docker Login & Pull Image
+        run: echo  ${{ secrets.REPO_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin && docker pull ghcr.io/gs-maftech/githubactions-msnotifications:v2
+      - name: Send a Notification
+        id: notify
+        uses: ./
+        with:
+          teams_webhook_url: ${{ secrets.TEAMS_HOOK }}
+          message: "Github Action Completed for ${{ github.repository }} with Build Number ${{ github.run_number }} and the outcome for packer build  for windows 2019 is ${{ needs.build.result }}."
